@@ -133,8 +133,8 @@ export default function AttributePage() {
 
     const handleKeyToggleDisable = async (key) => {
         try {
-            const newStatus = !key.isDisable;
-            await authAxiosClient.post(`/attributKey/${key._id}`, { isDisable: newStatus });
+            const newStatus = !key.isDisabled;
+            await authAxiosClient.post(`/attributKey/${key._id}`, { isDisabled: newStatus });
             fetchAttributeKeys();
         } catch (err) {
             alert('Failed to toggle disable');
@@ -165,7 +165,7 @@ export default function AttributePage() {
     const handleKeyDisable = async (keyId) => {
         if (!window.confirm('Disable this key?')) return;
         try {
-            await authAxiosClient.post(`/attributKey/${keyId}`, { isDisable: true });
+            await authAxiosClient.post(`/attributKey/${keyId}`, { isDisabled: true });
             fetchAttributeKeys();
         } catch (err) {
             alert('Disable failed');
@@ -240,9 +240,9 @@ export default function AttributePage() {
 
                                         <button
                                             onClick={() => handleKeyToggleDisable(key)}
-                                            className={`text-sm hover:underline ${key.isDisable ? 'text-green-600' : 'text-yellow-600'}`}
+                                            className={`text-sm hover:underline ${key.isDisabled ? 'text-green-600' : 'text-yellow-600'}`}
                                         >
-                                            {key.isDisable ? 'Enable' : 'Disable'}
+                                            {key.isDisabled ? 'Enable' : 'Disable'}
                                         </button>
 
 

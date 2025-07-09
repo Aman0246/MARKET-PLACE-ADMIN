@@ -53,7 +53,7 @@ export default function Category() {
         setSelected(cat);
         setValue('name', cat.name);
         setValue('order', cat.order);
-        setValue('isDisable', cat.isDisable);
+        setValue('isDisabled', cat.isDisabled);
     };
 
     const handleDelete = async (id) => {
@@ -71,7 +71,7 @@ export default function Category() {
 
     const resetForm = () => {
         setSelected(null);
-        reset({ name: '', order: 1, isDisable: false });
+        reset({ name: '', order: 1, isDisabled: false });
     };
 
     return (
@@ -99,7 +99,7 @@ export default function Category() {
                     className="w-full"
                 />
                 <label className="flex items-center space-x-2">
-                    <input type="checkbox" {...register('isDisable')} />
+                    <input type="checkbox" {...register('isDisabled')} />
                     <span>Disable</span>
                 </label>
                 <div className="space-x-2">

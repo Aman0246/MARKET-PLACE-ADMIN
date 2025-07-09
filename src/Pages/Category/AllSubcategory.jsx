@@ -17,7 +17,7 @@ export default function AllSubcategory() {
         name: '',
         order: '',
         isActive: true,
-        isDisable: false,
+        isDisabled: false,
         icon: null,
     });
 
@@ -58,7 +58,7 @@ export default function AllSubcategory() {
             formData.append('name', form.name.trim().toLowerCase());
             formData.append('order', Number(form.order));
             formData.append('isActive', form.isActive);
-            formData.append('isDisable', form.isDisable);
+            formData.append('isDisabled', form.isDisabled);
             formData.append('level', 1);
             formData.append('parentId', id);
             formData.append('type', 'both');
@@ -85,7 +85,7 @@ export default function AllSubcategory() {
     };
 
     const resetForm = () => {
-        setForm({ name: '', order: '', isActive: true, isDisable: false, icon: null });
+        setForm({ name: '', order: '', isActive: true, isDisabled: false, icon: null });
         setIsModalOpen(false);
         setEditing(false);
         setEditingId(null);
@@ -96,7 +96,7 @@ export default function AllSubcategory() {
             name: subcategory.name,
             order: subcategory.order,
             isActive: subcategory.isActive,
-            isDisable: subcategory.isDisable,
+            isDisabled: subcategory.isDisabled,
             icon: null,
         });
         setEditingId(subcategory._id);
@@ -119,7 +119,7 @@ export default function AllSubcategory() {
     const handleToggleDisable = async (subcategory) => {
         try {
             await authAxiosClient.post(`/category/${subcategory._id}`, {
-                isDisable: !subcategory.isDisable,
+                isDisabled: !subcategory.isDisabled,
             });
             await fetchSubcategories();
         } catch (err) {
@@ -159,7 +159,7 @@ export default function AllSubcategory() {
                             <div className="flex gap-3 text-sm">
                                 <button onClick={() => handleEditOpen(sub)} className="text-blue-600 hover:underline">Edit</button>
                                 <button onClick={() => handleToggleDisable(sub)} className="text-yellow-600 hover:underline">
-                                    {sub.isDisable ? 'Enable' : 'Disable'}
+                                    {sub.isDisabled ? 'Enable' : 'Disable'}
                                 </button>
                                 <button onClick={() => handleDelete(sub._id)} className="text-red-600 hover:underline">Delete</button>
                             </div>
@@ -211,8 +211,8 @@ export default function AllSubcategory() {
                                 <label className="flex items-center space-x-2">
                                     <input
                                         type="checkbox"
-                                        name="isDisable"
-                                        checked={form.isDisable}
+                                        name="isDisabled"
+                                        checked={form.isDisabled}
                                         onChange={handleInputChange}
                                     />
                                     <span>Disable</span>
