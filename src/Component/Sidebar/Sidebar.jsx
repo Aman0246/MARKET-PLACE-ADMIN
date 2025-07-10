@@ -9,6 +9,7 @@ import {
   AiOutlineSetting,
   AiOutlineLeft,
   AiOutlineRight,
+  AiOutlineEnvironment
 } from "react-icons/ai";
 import { useTheme } from "../../contexts/theme/hook/useTheme";
 import clsx from "clsx";
@@ -26,8 +27,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { name: "Settings", href: "/#", icon: AiOutlineSetting },
     { name: "Category", href: "/category", icon: AiOutlineSetting },
     { name: "Product", href: "/product", icon: AiOutlineSetting },
-
-
+    { name: "Locations", href: "/locations", icon: AiOutlineEnvironment },
   ];
 
   return (
@@ -45,16 +45,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           backgroundColor: theme.colors.background,
           color: theme.colors.textPrimary,
         }}
-
-        // Just replace your className in the Sidebar component with this:
-
         className={clsx(
           "fixed left-0 top-0 h-full border-r z-40 transition-all duration-300 ease-in-out",
-          // Desktop behavior
           "md:translate-x-0",
           isOpen ? "md:w-64" : "md:w-16",
-          // Mobile behavior - REMOVED THE CONFLICTING w-64 md:w-auto
-          isOpen ? "w-64" : "w-16", // Use consistent width classes
+          isOpen ? "w-64" : "w-16",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
@@ -68,7 +63,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           className={clsx(
             "absolute -right-3 top-8 border-2 rounded-full p-1.5 transition-colors duration-200",
             !isOpen && "md:rotate-180",
-            // Hide toggle button on mobile when sidebar is closed
             "hidden md:block",
             isOpen && "md:block"
           )}
@@ -99,7 +93,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
           <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-lg">L</span>
           </div>
-          {/* Always show text on mobile, conditionally on desktop */}
           <div className={clsx("ml-3 overflow-hidden", !isOpen && "md:hidden")}>
             <h1
               className="text-xl font-bold"
@@ -159,14 +152,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     }}
                     title={!isOpen ? item.name : ""}
                     onClick={() => {
-                      // Close sidebar on mobile when a link is clicked
                       if (window.innerWidth < 768) {
                         toggleSidebar();
                       }
                     }}
                   >
                     <Icon className="w-6 h-6 flex-shrink-0" />
-                    {/* Always show text on mobile, conditionally on desktop */}
                     <span
                       className={clsx(
                         "ml-3 font-medium text-sm overflow-hidden whitespace-nowrap",
@@ -176,7 +167,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                       {item.name}
                     </span>
 
-                    {/* Tooltip for collapsed state - only on desktop */}
                     {!isOpen && (
                       <div
                         className="absolute left-16 bg-gray-900 text-white px-2 py-1 rounded text-sm 

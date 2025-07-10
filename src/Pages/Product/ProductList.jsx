@@ -41,6 +41,7 @@ export default function ProductList() {
         subcategoryId: '',
         attributeKey: '',
         attributeValue: '',
+        useLocation: false,
         userLocation: null
     });
 
@@ -50,7 +51,6 @@ export default function ProductList() {
     // Fetch initial data
     useEffect(() => {
         fetchCategories();
-        getUserLocation();
     }, []);
 
     // Fetch products when filters, sort, or pagination changes
@@ -92,9 +92,25 @@ export default function ProductList() {
                 },
                 (error) => {
                     console.error('Error getting location:', error);
+                    setFilters(prev => ({
+                        ...prev,
+                        useLocation: false,
+                        userLocation: null
+                    }));
                 }
             );
         }
+    };
+
+    const handleLocationToggle = (enabled) => {
+        if (enabled && !filters.userLocation) {
+            getUserLocation();
+        }
+        setFilters(prev => ({
+            ...prev,
+            useLocation: enabled
+        }));
+        setPage(DEFAULT_PAGE);
     };
 
     const fetchCategories = async () => {
@@ -142,7 +158,7 @@ export default function ProductList() {
                         value: filters.attributeValue
                     }])
                 },
-                ...filters.userLocation && { location: JSON.stringify(filters.userLocation) },
+                ...filters.useLocation && filters.userLocation && { location: JSON.stringify(filters.userLocation) },
                 ...sortOption && {
                     sortBy: SORT_OPTIONS[sortOption].field,
                     sortOrder: SORT_OPTIONS[sortOption].order
@@ -180,7 +196,8 @@ export default function ProductList() {
             subcategoryId: '',
             attributeKey: '',
             attributeValue: '',
-            userLocation: filters.userLocation // Preserve user location
+            useLocation: false,
+            userLocation: null
         });
         setSortOption('');
         setPage(DEFAULT_PAGE);
@@ -306,8 +323,28 @@ export default function ProductList() {
                     </select>
                 </div>
 
+                {/* Location Toggle */}
+                <div>
+                    <label className="block text-sm font-medium mb-1 flex items-center">
+                        <MapPin size={16} className="mr-1" />
+                        Use Location
+                    </label>
+                    <div className="flex items-center space-x-2">
+                        <input
+                            type="checkbox"
+                            id="useLocation"
+                            checked={filters.useLocation}
+                            onChange={(e) => handleLocationToggle(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border rounded"
+                        />
+                        <label htmlFor="useLocation" className="text-sm text-gray-600">
+                            Enable distance-based filtering
+                        </label>
+                    </div>
+                </div>
+
                 {/* Location Status */}
-                {filters.userLocation && (
+                {filters.useLocation && filters.userLocation && (
                     <div className="col-span-full">
                         <p className="text-sm text-gray-600 flex items-center">
                             <MapPin size={16} className="mr-1" />

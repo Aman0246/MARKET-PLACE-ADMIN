@@ -10,6 +10,8 @@ import AllSubcategory from "./Pages/Category/AllSubcategory";
 import Category from "./Pages/Category/Category";
 import AttributePage from "./Pages/Category/AttributePage";
 import Product from "./Pages/Product/Product";
+import LocationManagement from './Pages/User/LocationManagement';
+import { ToastProvider } from "./Component/ToastProvider/ToastProvider";
 
 
 // Lazy-loaded pages
@@ -22,29 +24,35 @@ function App() {
   return (
     <Router>
       <Suspense fallback={<Loader />}>
-        <Routes>
-          {/* Public Routes */}
-          <Route element={<PublicRoute />}>
-            <Route path="/login" element={<Login />} />
-          </Route>
+        <ToastProvider>
 
-          {/* Private Routes */}
-          <Route element={<PrivateRoute />}>
-            <Route element={<LayoutWrapper />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/user" element={<User />} />
-
-              <Route path="/subcategory/:id" element={<AllSubcategory />} />
-
-              <Route path="/category" element={<Category />} />
-              <Route path="/subcategoryAttribute/:id" element={<AttributePage />} />
-
-              <Route path="/product/*" element={<Product />} />
-
+          <Routes>
+            {/* Public Routes */}
+            <Route element={<PublicRoute />}>
+              <Route path="/login" element={<Login />} />
             </Route>
-          </Route>
-        </Routes>
+
+            {/* Private Routes */}
+            <Route element={<PrivateRoute />}>
+              <Route element={<LayoutWrapper />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/user" element={<User />} />
+
+                <Route path="/subcategory/:id" element={<AllSubcategory />} />
+
+                <Route path="/category" element={<Category />} />
+                <Route path="/subcategoryAttribute/:id" element={<AttributePage />} />
+
+                <Route path="/product/*" element={<Product />} />
+
+                <Route path="/locations" element={<LocationManagement />} />
+
+              </Route>
+            </Route>
+          </Routes>
+        </ToastProvider>
+
       </Suspense>
     </Router>
   );

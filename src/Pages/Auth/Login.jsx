@@ -35,14 +35,14 @@ export default function Login() {
     dispatch(login({ email: form.email, password: form.password }))
       .then((result) => {
         if (login.fulfilled.match(result)) {
-          toast.success("Login successful");
+          toast("Login successful");
           navigate('/dashboard')
         } else {
-          toast.error(result.payload || "Login failed");
+          toast(result.payload || "Login failed");
         }
       })
       .catch((err) => {
-        toast.error("Something went wrong");
+        toast("Something went wrong");
         console.error(err);
       })
       .finally(() => { });

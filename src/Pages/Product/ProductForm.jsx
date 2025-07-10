@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, X, Plus, Upload, MapPin, Crosshair } from 'lucide-react';
 import authAxiosClient from '../../api/authAxiosClient';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 
 // Constants
+const GOOGLE_MAPS_API_KEY = "AIzaSyD5mQuPg4TTUrxYtPj_TffvTECNftfJ_aw"; // Add this to your .env file
+const libraries = ['places'];
+
 const PRODUCT_TYPE = {
     SELL: 'SELL',
     RENT: 'RENT',
@@ -30,6 +34,14 @@ const RENT_DURATION = {
 
 export default function ProductForm({ product = null, onSubmit, onCancel }) {
     const isEdit = !!product;
+
+    const { isLoaded, loadError } = useLoadScript({
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+        libraries,
+    });
+
+    const [autocomplete, setAutocomplete] = useState(null);
+    const [address, setAddress] = useState('');
 
     // Form state
     const [formData, setFormData] = useState({
@@ -72,6 +84,10 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
     // Add new state for location detection
     const [isDetectingLocation, setIsDetectingLocation] = useState(false);
     const [locationError, setLocationError] = useState('');
+
+    // Add new state for saved addresses
+    const [savedAddresses, setSavedAddresses] = useState([]);
+    const [selectedAddressId, setSelectedAddressId] = useState('');
 
     // Fetch categories on mount
     useEffect(() => {
@@ -127,6 +143,33 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
             });
         }
     }, [product]);
+
+    // Add function to fetch saved addresses
+    const fetchSavedAddresses = async () => {
+        try {
+            const response = await authAxiosClient.get('/userAddress');
+            if (!response.data.error) {
+                setSavedAddresses(response.data?.data || []);
+                // If editing product and it has location, select the matching address
+                if (product && product.location) {
+                    const matchingAddress = response.data?.data.find(addr =>
+                        addr.latitude === product.location.coordinates[1] &&
+                        addr.longitude === product.location.coordinates[0]
+                    );
+                    if (matchingAddress) {
+                        setSelectedAddressId(matchingAddress._id);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch addresses:', error);
+        }
+    };
+
+    // Add useEffect to fetch addresses
+    useEffect(() => {
+        fetchSavedAddresses();
+    }, []);
 
     // Fetch functions
     const fetchCategories = async () => {
@@ -236,20 +279,29 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
                 }
                 break;
 
-            case 'pickupAddress':
-                if (formData.deliveryMode === DELIVERY_MODE.BUYER_PICKUP && !value.trim()) {
-                    errors.pickupAddress = 'Pickup address is required when buyer pickup is selected';
+            case 'selectedAddressId':
+                if (!value) {
+                    errors.address = 'Please select a delivery address';
                 }
                 break;
 
-            case 'location':
-                if (!value.coordinates || value.coordinates.length !== 2) {
-                    errors.location = 'Valid coordinates are required';
-                } else {
-                    const [lng, lat] = value.coordinates;
-                    if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
-                        errors.location = 'Coordinates must be within valid ranges';
-                    }
+            case 'attributes':
+                if (formData.subcategoryId && attributeKeys.length > 0) {
+                    const requiredAttributes = attributeKeys.filter(key => key.isRequired);
+                    requiredAttributes.forEach(attr => {
+                        if (!value.find(v => v.key === attr._id)) {
+                            errors[`attributes.${attr._id}`] = `${attr.name} is required`;
+                        }
+                    });
+                }
+                break;
+
+            case 'images':
+                if (!value || value.length === 0) {
+                    errors.images = 'At least one product image is required';
+                }
+                if (value.length > 10) {
+                    errors.images = 'Maximum 10 images allowed';
                 }
                 break;
         }
@@ -265,6 +317,10 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
             const fieldErrors = validateField(key, formData[key], formData);
             allErrors = { ...allErrors, ...fieldErrors };
         });
+
+        // Validate selected address
+        const addressErrors = validateField('selectedAddressId', selectedAddressId, formData);
+        allErrors = { ...allErrors, ...addressErrors };
 
         setErrors(allErrors);
         return Object.keys(allErrors).length === 0;
@@ -374,7 +430,6 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
         setLoading(true);
 
         try {
-            // Validate form before submission
             const validationErrors = validateForm();
             if (Object.keys(validationErrors).length > 0) {
                 setErrors(validationErrors);
@@ -382,68 +437,125 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
                 return;
             }
 
-            const formDataToSend = new FormData();
+            // Validate that an address is selected
+            if (!selectedAddressId) {
+                setErrors(prev => ({
+                    ...prev,
+                    address: 'Please select a delivery address'
+                }));
+                setLoading(false);
+                return;
+            }
 
-            // Basic fields
-            formDataToSend.append('name', formData.name.trim());
-            formDataToSend.append('description', formData.description.trim());
-            formDataToSend.append('type', formData.type);
-            formDataToSend.append('categoryId', formData.categoryId);
-            formDataToSend.append('subcategoryId', formData.subcategoryId);
-            formDataToSend.append('condition', formData.condition);
-            formDataToSend.append('deliveryMode', formData.deliveryMode);
+            const selectedAddress = savedAddresses.find(addr => addr._id === selectedAddressId);
+            if (!selectedAddress) {
+                setErrors(prev => ({
+                    ...prev,
+                    address: 'Selected address not found'
+                }));
+                setLoading(false);
+                return;
+            }
 
-            // Conditional fields based on product type
+            // Create the request payload with all required fields
+            const payload = {
+                // Basic Information
+                name: formData.name.trim(),
+                description: formData.description.trim(),
+                type: formData.type,
+                categoryId: formData.categoryId,
+                subcategoryId: formData.subcategoryId,
+                condition: formData.condition,
+                deliveryMode: formData.deliveryMode,
+
+                // Location and Address
+                location: {
+                    type: 'Point',
+                    coordinates: [selectedAddress.longitude, selectedAddress.latitude]
+                },
+                address: {
+                    formattedAddress: selectedAddress.formattedAddress,
+                    streetNumber: selectedAddress.streetNumber || '',
+                    route: selectedAddress.route || '',
+                    locality: selectedAddress.locality || '',
+                    administrativeAreaLevel1: selectedAddress.administrativeAreaLevel1 || '',
+                    country: selectedAddress.country || '',
+                    postalCode: selectedAddress.postalCode || ''
+                },
+
+                // Product Status and Control Flags
+                productStatus: isEdit ? formData.productStatus : undefined,
+
+                // Attributes
+                attributes: formData.attributes.map(attr => ({
+                    key: attr.key,
+                    value: attr.value
+                }))
+            };
+
+            // Add type-specific fields
             if (formData.type === PRODUCT_TYPE.SELL) {
-                formDataToSend.append('price', formData.price);
+                payload.price = Number(formData.price);
+                // Set other type-specific fields to null
+                payload.rentDetails = null;
+                payload.auctionDetails = null;
             }
 
             if (formData.type === PRODUCT_TYPE.RENT) {
-                const rentDetails = {
+                payload.rentDetails = {
                     rentPrice: Number(formData.rentDetails.rentPrice),
                     duration: Number(formData.rentDetails.duration),
-                    securityAmount: formData.rentDetails.securityAmount ? Number(formData.rentDetails.securityAmount) : undefined
+                    securityAmount: formData.rentDetails.securityAmount
+                        ? Number(formData.rentDetails.securityAmount)
+                        : Number(formData.rentDetails.rentPrice) * 2 // Default to 2x rent price
                 };
-                formDataToSend.append('rentDetails', JSON.stringify(rentDetails));
+                // Set other type-specific fields to null
+                payload.price = null;
+                payload.auctionDetails = null;
             }
 
             if (formData.type === PRODUCT_TYPE.AUCTION) {
-                const auctionDetails = {
+                payload.auctionDetails = {
                     startPrice: Number(formData.auctionDetails.startPrice),
                     reservePrice: Number(formData.auctionDetails.reservePrice),
                     bidIncrement: Number(formData.auctionDetails.bidIncrement),
                     startTime: new Date(formData.auctionDetails.startTime).toISOString(),
                     endTime: new Date(formData.auctionDetails.endTime).toISOString()
                 };
-                formDataToSend.append('auctionDetails', JSON.stringify(auctionDetails));
+                // Set other type-specific fields to null
+                payload.price = null;
+                payload.rentDetails = null;
             }
 
-            // Pickup address (only if delivery mode is BUYER_PICKUP)
-            if (formData.deliveryMode === DELIVERY_MODE.BUYER_PICKUP) {
-                formDataToSend.append('pickupAddress', formData.pickupAddress.trim());
+            // If editing, add the product ID
+            if (isEdit) {
+                payload.productId = product._id;
             }
 
-            // Location (GeoJSON format)
-            formDataToSend.append('location', JSON.stringify({
-                type: 'Point',
-                coordinates: formData.location.coordinates.map(Number)
-            }));
+            // Check if there are new images to upload
+            const hasNewImages = formData.images.some(image => image instanceof File);
 
-            // Attributes (array of key-value pairs)
-            const attributes = formData.attributes.map(attr => ({
-                key: attr.key,
-                value: attr.value
-            }));
-            formDataToSend.append('attributes', JSON.stringify(attributes));
+            // Create FormData and add each field individually
+            const formDataToSend = new FormData();
 
-            // Images (append all images to the images field)
-            formData.images.forEach(image => {
-                if (image instanceof File) {
-                    formDataToSend.append('images', image);
+            // Add each field individually to FormData
+            Object.entries(payload).forEach(([key, value]) => {
+                if (value !== null && value !== undefined) {
+                    formDataToSend.append(key, typeof value === 'object' ? JSON.stringify(value) : value);
                 }
             });
 
+            // Add images separately if any
+            if (hasNewImages) {
+                formData.images.forEach((image) => {
+                    if (image instanceof File) {
+                        formDataToSend.append('images', image);
+                    }
+                });
+            }
+
             await onSubmit(formDataToSend);
+
         } catch (err) {
             console.error('Submit failed:', err);
             setErrors(prev => ({
@@ -455,51 +567,83 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
         }
     };
 
-    // Add new function for location detection
-    const detectCurrentLocation = () => {
-        setIsDetectingLocation(true);
-        setLocationError('');
+    const onLoad = (autocomplete) => {
+        setAutocomplete(autocomplete);
+    };
 
-        if (!navigator.geolocation) {
-            setLocationError('Geolocation is not supported by your browser');
-            setIsDetectingLocation(false);
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { longitude, latitude } = position.coords;
+    const onPlaceChanged = () => {
+        if (autocomplete !== null) {
+            const place = autocomplete.getPlace();
+            if (place.geometry) {
+                const lat = place.geometry.location.lat();
+                const lng = place.geometry.location.lng();
                 setFormData(prev => ({
                     ...prev,
                     location: {
                         type: 'Point',
-                        coordinates: [longitude, latitude]
-                    }
+                        coordinates: [lng, lat]
+                    },
+                    pickupAddress: place.formatted_address
                 }));
-                setIsDetectingLocation(false);
-            },
-            (error) => {
-                let errorMessage = 'Failed to get location';
-                switch (error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMessage = 'Please allow location access to use this feature';
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        errorMessage = 'Location information is unavailable';
-                        break;
-                    case error.TIMEOUT:
-                        errorMessage = 'Location request timed out';
-                        break;
-                }
-                setLocationError(errorMessage);
-                setIsDetectingLocation(false);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 0
+                setAddress(place.formatted_address);
             }
-        );
+        }
+    };
+
+    // Update detectCurrentLocation to use Google Maps Geocoding
+    const detectCurrentLocation = () => {
+        setIsDetectingLocation(true);
+        setLocationError('');
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    try {
+                        const { latitude, longitude } = position.coords;
+                        const response = await fetch(
+                            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
+                        );
+                        const data = await response.json();
+
+                        if (data.results && data.results[0]) {
+                            const place = data.results[0];
+                            setFormData(prev => ({
+                                ...prev,
+                                location: {
+                                    type: 'Point',
+                                    coordinates: [longitude, latitude]
+                                },
+                                pickupAddress: place.formatted_address
+                            }));
+                            setAddress(place.formatted_address);
+                        }
+                        setIsDetectingLocation(false);
+                    } catch (error) {
+                        setLocationError('Failed to get location details');
+                        setIsDetectingLocation(false);
+                    }
+                },
+                (error) => {
+                    let errorMessage = 'Failed to get location';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = 'Please allow location access to use this feature';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = 'Location information is unavailable';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = 'Location request timed out';
+                            break;
+                    }
+                    setLocationError(errorMessage);
+                    setIsDetectingLocation(false);
+                }
+            );
+        } else {
+            setLocationError('Geolocation is not supported by your browser');
+            setIsDetectingLocation(false);
+        }
     };
 
     return (
@@ -763,74 +907,65 @@ export default function ProductForm({ product = null, onSubmit, onCancel }) {
                             </option>
                         ))}
                     </select>
+                    {errors.deliveryMode && (
+                        <p className="text-red-500 text-sm mt-1">{errors.deliveryMode}</p>
+                    )}
                 </div>
 
-                {formData.deliveryMode === DELIVERY_MODE.BUYER_PICKUP && (
+                {/* Address Selection - Required for all delivery modes */}
+                <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Pickup Address</label>
-                        <textarea
-                            name="pickupAddress"
-                            value={formData.pickupAddress}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border rounded-md"
+                        <label className="block text-sm font-medium mb-1">
+                            Product Location/Pickup Address
+                            <span className="text-red-500 ml-1">*</span>
+                        </label>
+                        <select
+                            value={selectedAddressId}
+                            onChange={(e) => setSelectedAddressId(e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-md ${errors.address ? 'border-red-500' : ''}`}
                             required
-                            rows="3"
-                            placeholder="Enter the complete pickup address"
-                        />
-                    </div>
-                )}
-
-                {/* Location Information */}
-                <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium">Location Coordinates</label>
-                        <button
-                            type="button"
-                            onClick={detectCurrentLocation}
-                            disabled={isDetectingLocation}
-                            className="flex items-center text-sm text-blue-600 hover:text-blue-800"
                         >
-                            <Crosshair className="w-4 h-4 mr-1" />
-                            {isDetectingLocation ? 'Detecting...' : 'Detect My Location'}
-                        </button>
+                            <option value="">Select an address</option>
+                            {savedAddresses.map((addr) => (
+                                <option key={addr._id} value={addr._id}>
+                                    {addr.formattedAddress} {addr.isDefault && '(Default)'}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.address && (
+                            <p className="text-red-500 text-sm mt-1">{errors.address}</p>
+                        )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm text-gray-600 mb-1">Longitude</label>
-                            <input
-                                type="number"
-                                value={formData.location.coordinates[0]}
-                                onChange={(e) => handleLocationChange(0, e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md"
-                                required
-                                step="any"
-                                min="-180"
-                                max="180"
-                                placeholder="-180 to 180"
-                            />
+
+                    {selectedAddressId && (
+                        <div className="bg-gray-50 p-4 rounded-md">
+                            <h4 className="text-sm font-medium mb-2">Selected Address Details</h4>
+                            {(() => {
+                                const addr = savedAddresses.find(a => a._id === selectedAddressId);
+                                return addr ? (
+                                    <div className="text-sm text-gray-600">
+                                        <p>{addr.formattedAddress}</p>
+                                        <p className="mt-1">
+                                            {addr.locality}, {addr.administrativeAreaLevel1}
+                                            {addr.postalCode && `, ${addr.postalCode}`}
+                                        </p>
+                                        <p className="mt-2 text-xs text-gray-500">
+                                            Location coordinates: [{addr.longitude.toFixed(6)}, {addr.latitude.toFixed(6)}]
+                                        </p>
+                                    </div>
+                                ) : null;
+                            })()}
                         </div>
-                        <div>
-                            <label className="block text-sm text-gray-600 mb-1">Latitude</label>
-                            <input
-                                type="number"
-                                value={formData.location.coordinates[1]}
-                                onChange={(e) => handleLocationChange(1, e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md"
-                                required
-                                step="any"
-                                min="-90"
-                                max="90"
-                                placeholder="-90 to 90"
-                            />
-                        </div>
-                    </div>
-                    {locationError && (
-                        <p className="text-red-500 text-sm mt-1">{locationError}</p>
                     )}
-                    <p className="text-sm text-gray-500 mt-1 flex items-center">
-                        <MapPin className="inline-block mr-1" size={14} />
-                        Click "Detect My Location" or enter coordinates manually
-                    </p>
+
+                    {savedAddresses.length === 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md">
+                            <p className="text-yellow-700 text-sm flex items-center">
+                                <AlertCircle className="mr-2" size={16} />
+                                No saved addresses found. Please add an address in your profile settings first.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 

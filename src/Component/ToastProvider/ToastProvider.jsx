@@ -29,15 +29,14 @@ export const ToastProvider = ({ children }) => {
     toast
     relative overflow-hidden px-4 py-3  shadow-lg text-white 
     flex justify-between items-center min-w-[240px] max-w-xs
-    ${
-      type === "success"
-        ? "bg-green-600"
-        : type === "error"
-        ? "bg-red-600"
-        : type === "info"
-        ? "bg-blue-600"
-        : "bg-yellow-600"
-    }
+    ${type === "success"
+                ? "bg-green-600"
+                : type === "error"
+                  ? "bg-red-600"
+                  : type === "info"
+                    ? "bg-blue-600"
+                    : "bg-yellow-600"
+              }
   `}
           >
             <span>{message}</span>
